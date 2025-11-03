@@ -1,0 +1,63 @@
+# Compiled object files
+*.o
+*.obj
+
+# Compiled executable files
+*.exe
+*.out
+*.a
+*.so
+*.dylib
+a
+a.out
+
+# Debug symbols
+*.dSYM/
+*.su
+*.gch
+*.pch
+
+# Dependency files
+*.d
+*.dependencies
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.cproject
+.project
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# Build directories
+build/
+cmake-build-debug/
+cmake-build-release/
+dist/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# User-specific files
+*.user
+*.VC.db
+
+# OS-specific
+Thumbs.db
+.DS_Store
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Zed editor
+.zed/
