@@ -1,6 +1,7 @@
 #include <iostream>
 #include <chrono>
 #include "cpu_radix_sort.cpp"
+#include "cpu_radix_parallel.cpp"
 using namespace std;
 
 long int *tablePointer;
@@ -53,8 +54,9 @@ int main() {
             break;
         case 2:
             {
+                CPURadixSortParallel sorter(n, tablePointer);
                 auto startTime = chrono::high_resolution_clock::now();
-                // TODO: Implement parallel CPU radix sort
+                sorter.Sort();
                 auto endTime = chrono::high_resolution_clock::now();
                 chrono::duration<double, milli> elapsedTime = endTime - startTime;
                 cout << "Czas wykonania: " << elapsedTime.count() << " ms." << endl;

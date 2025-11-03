@@ -10,6 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(SRC
     main.cpp
     cpu_radix_sort.cpp
+    cpu_radix_parallel.cpp
 )
 
 # Add the executable target
