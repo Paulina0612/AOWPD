@@ -1,7 +1,9 @@
-#include <iostream>
+﻿#include <iostream>
 #include <chrono>
 #include "cpu_radix_sort.cpp"
 #include "cpu_radix_parallel.cpp"
+#include "gpu_radix_sort.cu"
+
 using namespace std;
 
 long int *tablePointer;
@@ -67,9 +69,12 @@ int main()
         break;
         case 3:
         {
-            cout << "Plik main.cpp nie zawiera implementacji sortowania na GPU i jest do wykorzystania na urządzeniach bez GPU/odpowiedniego środowiska." << endl;
-            cout << "Wszystkie algorytmy zaimplementowane są w kernel.cu" << endl;
-        }
+            GPUParallelRadixSort sorter(n, tablePointer);
+            auto startTime = chrono::high_resolution_clock::now();
+            sorter.Sort();
+            auto endTime = chrono::high_resolution_clock::now();
+            chrono::duration<double, milli> elapsedTime = endTime - startTime;
+            cout << "Czas wykonania: " << elapsedTime.count() << " ms." << endl;
         }
         break;
         case 4:
