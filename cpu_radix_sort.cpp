@@ -49,10 +49,13 @@ public:
     void Sort() override {
         // Find the maximum number to know the number of digits
         long int max = GetMax();
+        long int *tmp;
 
         // Radix sort loop
         for (long int exp = 1; max / exp > 0; exp *= 10) {
-            table = CountingSort(exp);
+            tmp = CountingSort(exp);
+            free(table);
+            table = tmp;
         }
     }
 };
