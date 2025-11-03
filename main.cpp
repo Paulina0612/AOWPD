@@ -1,4 +1,5 @@
 #include <iostream>
+#include <chrono>
 #include "cpu_radix_sort.cpp"
 using namespace std;
 
@@ -37,27 +38,41 @@ int main() {
         int choice;
         cin >> choice;
 
-        double startTime = clock();
-
         switch (choice)
         {
-        case 1: CPURadixSort(n, tablePointer); break;
+        case 1: 
+            {
+                CPUSequentialRadixSort sorter(n, tablePointer);
+                cout << "Sortowanie za pomoca: " << sorter.GetName() << endl;
+                auto startTime = chrono::high_resolution_clock::now();
+                sorter.Sort();
+                auto endTime = chrono::high_resolution_clock::now();
+                chrono::duration<double, milli> elapsedTime = endTime - startTime;
+                cout << "Czas wykonania: " << elapsedTime.count() << " ms." << endl;
+            }
+            break;
         case 2:
-            // TODO: Implement parallel CPU radix sort
+            {
+                auto startTime = chrono::high_resolution_clock::now();
+                // TODO: Implement parallel CPU radix sort
+                auto endTime = chrono::high_resolution_clock::now();
+                chrono::duration<double, milli> elapsedTime = endTime - startTime;
+                cout << "Czas wykonania: " << elapsedTime.count() << " ms." << endl;
+            }
             break;
         case 3:
-            // TODO: Implement GPU radix sort
+            {
+                auto startTime = chrono::high_resolution_clock::now();
+                // TODO: Implement GPU radix sort
+                auto endTime = chrono::high_resolution_clock::now();
+                chrono::duration<double, milli> elapsedTime = endTime - startTime;
+                cout << "Czas wykonania: " << elapsedTime.count() << " ms." << endl;
+            }
             break;
         case 4: exit(0); break;
         default:
             cout << "Nieprawidlowy wybor. Sprobuj ponownie." << endl;
             break;
-        }
-
-        double endTime = clock();
-        if (choice >= 1 && choice <= 3) {
-            double elapsedTime = double(endTime - startTime) / CLOCKS_PER_SEC;
-            cout << "Czas wykonania: " << elapsedTime << " sekund." << endl;
         }
     }
 
