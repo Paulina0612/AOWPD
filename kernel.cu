@@ -1,88 +1,149 @@
 ﻿#include <iostream>
 #include <chrono>
+#include <string>
 #include "cpu_radix_sort.cpp"
 #include "cpu_radix_parallel.cpp"
 #include "gpu_radix_sort.cu"
 
 using namespace std;
 
-long int *tablePointer;
-
-void GenerateTable(int n)
+// helper function to print table (for debugging purposes)
+void PrintTable(long int* table, int size)
 {
-    srand(time(0));
-
-    tablePointer = (long int *)malloc(n * sizeof(long int));
-    if (tablePointer == NULL)
+    for (int i = 0; i < size; i++)
     {
-        cerr << "Nie udalo sie zaalokac pamieci!" << endl;
-        exit(1);
+        cout << table[i] << " ";
     }
-
-    for (int i = 0; i < n; i++)
-    {
-        tablePointer[i] = rand();
-    }
+    cout << endl;
 }
 
 int main()
 {
-    cout << "Podaj wielkosc tablicy do wygenerowania: " << endl;
+    string sort_names[3];
+    sort_names[0] = "CPU Sequential Radix Sort";
+    sort_names[1] = "CPU Parallel Radix Sort";
+    sort_names[2] = "GPU Parallel Radix Sort";
+
+    // Declaring variables
+    bool program = 1;
+    int sample;
     int n;
-    cin >> n;
 
-    GenerateTable(n);
+    float sort_times[3];
+    chrono::steady_clock::time_point start;
+    chrono::steady_clock::time_point end;
 
-    while (true)
+    srand(time(NULL));
+
+    while (program)
     {
-        cout << "Wybierz opcje: " << endl;
-        cout << "1. Sortowanie tablicy za pomoca sekwencyjnego sortowania pozycyjnego na CPU" << endl;
-        cout << "2. Sortowanie tablicy za pomoca rownoleglego sortowania pozycyjnego na CPU." << endl;
-        cout << "3. Sortowanie tablicy za pomoca sortowania pozycyjnego na GPU." << endl;
-        cout << "4. Wyjscie z programu." << endl;
+        // Cleaning sort times
+        for (int i = 0; i < 3; i++)
+        {
+            sort_times[i] = 0;
+        }
 
-        int choice;
-        cin >> choice;
+        // Setting sample size
+        cout << "Set sample size: ";
+        cin >> sample;
 
-        switch (choice)
+        // Creating tables
+        cout << "Set number of table elements: ";
+        cin >> n;
+        long int* tab = new long int[n];
+        long int* tab_copy = new long int[n];
+
+        // Initialize table with sequential indexes
+        for (long int i = 0; i < n; i++)
         {
-        case 1:
+            tab[i] = i;
+            tab_copy[i] = tab[i];
+        }
+
+        // Experiment
+        for (int s = 0; s < sample; s++)
         {
-            CPUSequentialRadixSort sorter(n, tablePointer);
-            cout << "Sortowanie za pomoca: " << sorter.GetName() << endl;
-            auto startTime = chrono::high_resolution_clock::now();
-            sorter.Sort();
-            auto endTime = chrono::high_resolution_clock::now();
-            chrono::duration<double, milli> elapsedTime = endTime - startTime;
-            cout << "Czas wykonania: " << elapsedTime.count() << " ms." << endl;
+            // Creating new random table for next sample by shuffling indexes
+            for (long int i = 0; i < n; i++)
+            {
+                int los = rand() % n;
+                swap(tab[i], tab[los]);
+            }
+            for (long int i = 0; i < n; i++)
+            {
+                tab_copy[i] = tab[i];
+            }
+
+            // Sorting and time counting
+            for (int sort = 0; sort < 3; sort++)
+            {
+                switch (sort)
+                {
+                case 0:
+                    {
+                        CPUSequentialRadixSort sorter(n, tab);
+                        start = chrono::steady_clock::now();
+                        sorter.Sort();
+                        end = chrono::steady_clock::now();
+                    }
+                    break;
+                case 1:
+                    {
+                        CPURadixSortParallel sorter(n, tab);
+                        start = chrono::steady_clock::now();
+                        sorter.Sort();
+                        end = chrono::steady_clock::now();
+                    }
+                    break;
+                case 2:
+                    {
+                        GPUParallelRadixSort sorter(n, tab);
+                        start = chrono::steady_clock::now();
+                        sorter.Sort();
+                        end = chrono::steady_clock::now();
+                    }
+                    break;
+                }
+                sort_times[sort] += chrono::duration_cast<chrono::microseconds>(end - start).count();
+
+                // Checking if sorting was correctly done
+                bool successful = true;
+                for (int i = 1; i < n; i++) {
+                    if (tab[i - 1] > tab[i]) {
+                        successful = false;
+                        break;
+                    }
+                }
+
+                if (!successful)
+                {
+                    cout << "Sorting was not done correctly for " << sort_names[sort] << "!" << endl;
+                    //PrintTable(tab, n);
+                }
+
+                // Bring back data
+                for (long int i = 0; i < n; i++)
+                {
+                    tab[i] = tab_copy[i];
+                }
+            }
+            cout << "End of sample: " << s + 1 << endl;
         }
-        break;
-        case 2:
+        
+        // Print mean time of execution
+        cout << endl << "Results: " << endl;
+        for (int i = 0; i < 3; i++)
         {
-            CPURadixSortParallel sorter(n, tablePointer);
-            auto startTime = chrono::high_resolution_clock::now();
-            sorter.Sort();
-            auto endTime = chrono::high_resolution_clock::now();
-            chrono::duration<double, milli> elapsedTime = endTime - startTime;
-            cout << "Czas wykonania: " << elapsedTime.count() << " ms." << endl;
+            cout << sort_names[i] << ": " << sort_times[i] / sample << " microseconds." << endl;
         }
-        break;
-        case 3:
-        {
-            GPUParallelRadixSort sorter(n, tablePointer);
-            auto startTime = chrono::high_resolution_clock::now();
-            sorter.Sort();
-            auto endTime = chrono::high_resolution_clock::now();
-            chrono::duration<double, milli> elapsedTime = endTime - startTime;
-            cout << "Czas wykonania: " << elapsedTime.count() << " ms." << endl;
-        }
-        break;
-        case 4:
-            exit(0);
-            break;
-        default:
-            cout << "Nieprawidlowy wybor. Sprobuj ponownie." << endl;
-            break;
-        }
+        cout << endl;
+
+        cout << "Do you want to run another test? (1 for yes, 0 for no): ";
+        cin >> program;
+
+        delete[] tab;
+        delete[] tab_copy;
     }
+    
+    return 0;
 }

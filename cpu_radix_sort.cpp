@@ -8,7 +8,7 @@
 class CPUSequentialRadixSort : public RadixSort {
 private:
     // Counting sort function for a specific digit position
-    long int* CountingSort(long int exp) {
+    void CountingSort(long int exp) {
         // Output array that will hold the sorted numbers
         long int *sortedArray;
         sortedArray = (long int*)malloc(n * sizeof(long int));
@@ -36,7 +36,13 @@ private:
             countArray[(table[i] / exp) % 10]--;
         }
 
-        return sortedArray;
+        // Copy sorted data back to original table
+        for (i = 0; i < n; i++) {
+            table[i] = sortedArray[i];
+        }
+
+        // Free temporary array
+        free(sortedArray);
     }
 
 public:
@@ -49,13 +55,10 @@ public:
     void Sort() override {
         // Find the maximum number to know the number of digits
         long int max = GetMax();
-        long int *tmp;
 
         // Radix sort loop
         for (long int exp = 1; max / exp > 0; exp *= 10) {
-            tmp = CountingSort(exp);
-            free(table);
-            table = tmp;
+            CountingSort(exp);
         }
     }
 };
