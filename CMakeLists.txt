@@ -1,0 +1,16 @@
+cmake_minimum_required(VERSION 3.12)
+
+# Set the project name and version
+project(RadixSort VERSION 1.0)
+
+# Specify the C++ standard
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+set(SRC
+    main.cpp
+    cpu_radix_sort.cpp
+)
+
+# Add the executable target
+add_executable(RadixSort ${SRC})
