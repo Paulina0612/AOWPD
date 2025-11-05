@@ -15,28 +15,28 @@ class CPURadixSortParallel : public RadixSort {
 private:
     int num_threads;
     std::barrier<std::function<void()>> sync_point;
-    std::vector<std::array<int, 10>> local_counts;
-    std::array<int, 10> global_prefix;
+    std::vector<std::array<int, BASE>> local_counts;
+    std::array<int, BASE> global_prefix;
     
     void CountingSort(long int exp, long int* output, int thread_id, int n_owned, int owned_idx) {
         local_counts[thread_id] = {0};
         
         for (int i = owned_idx; i < owned_idx + n_owned; i++) {
-            local_counts[thread_id][(table[i] / exp) % 10]++;
+            local_counts[thread_id][(table[i] / exp) % BASE]++;
         }
 
         sync_point.arrive_and_wait();
 
         if (thread_id == 0) {
             global_prefix = {0};
-            for (int d = 0; d < 10; d++) {
+            for (int d = 0; d < BASE; d++) {
                 for (int t = 0; t < num_threads; t++) {
                     global_prefix[d] += local_counts[t][d];
                 }
             }
             
             int sum = 0;
-            for (int d = 0; d < 10; d++) {
+            for (int d = 0; d < BASE; d++) {
                 int count = global_prefix[d];
                 global_prefix[d] = sum;
                 sum += count;
@@ -45,15 +45,15 @@ private:
 
         sync_point.arrive_and_wait();
 
-        std::array<int, 10> thread_offset = global_prefix;
+        std::array<int, BASE> thread_offset = global_prefix;
         for (int t = 0; t < thread_id; t++) {
-            for (int d = 0; d < 10; d++) {
+            for (int d = 0; d < BASE; d++) {
                 thread_offset[d] += local_counts[t][d];
             }
         }
 
         for (int i = owned_idx; i < owned_idx + n_owned; i++) {
-            int digit = (table[i] / exp) % 10;
+            int digit = (table[i] / exp) % BASE;
             output[thread_offset[digit]++] = table[i];
         }
 
@@ -79,7 +79,7 @@ public:
             exit(1);
         }
 
-        for (long int exp = 1; max / exp > 0; exp *= 10) {
+        for (long int exp = 1; max / exp > 0; exp *= BASE) {
             std::vector<std::thread> threads;
             int start_idx = 0;
             for (int i = 0; i < num_threads; i++) {

@@ -15,3 +15,10 @@ set(SRC
 
 # Add the executable target
 add_executable(RadixSort ${SRC})
+
+set(BASE 10 CACHE STRING "Base to use while building")
+
+target_compile_definitions(RadixSort
+    PRIVATE
+    BASE=${BASE}
+)

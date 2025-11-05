@@ -130,7 +130,7 @@ int main()
         
         // Print mean time of execution
         cout << endl << "Results: " << endl;
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < 2; i++)
         {
             cout << sort_names[i] << ": " << sort_times[i] / sample << " microseconds." << endl;
         }

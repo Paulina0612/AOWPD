@@ -19,21 +19,21 @@ private:
         }
 
         // Initialize count array
-        int i, countArray[10] = { 0 };
+        int i, countArray[BASE] = { 0 };
 
         // Store count of occurrences in countArray[]
         for (i = 0; i < n; i++) {
-            countArray[(table[i] / exp) % 10]++;
+            countArray[(table[i] / exp) % BASE]++;
         }
 
         // Change countArray[i] so that it contains actual position of this digit in sortedArray[]
-        for (i = 1; i < 10; i++)
+        for (i = 1; i < BASE; i++)
             countArray[i] += countArray[i - 1];
 
         // Build the output array
         for (i = n - 1; i >= 0; i--) {
-            sortedArray[countArray[(table[i] / exp) % 10] - 1] = table[i];
-            countArray[(table[i] / exp) % 10]--;
+            sortedArray[countArray[(table[i] / exp) % BASE] - 1] = table[i];
+            countArray[(table[i] / exp) % BASE]--;
         }
 
         // Copy sorted data back to original table
@@ -57,7 +57,7 @@ public:
         long int max = GetMax();
 
         // Radix sort loop
-        for (long int exp = 1; max / exp > 0; exp *= 10) {
+        for (long int exp = 1; max / exp > 0; exp *= BASE) {
             CountingSort(exp);
         }
     }
