@@ -3,6 +3,7 @@
 #include <string>
 #include "cpu_radix_sort.cpp"
 #include "cpu_radix_parallel.cpp"
+#include "radix_sort.h"
 
 using namespace std;
 
@@ -73,24 +74,25 @@ int main()
                 tab_copy[i] = tab[i];
             }
 
+            RadixSort *sorter;
             // Sorting and time counting
-            for (int sort = 0; sort < 3; sort++)
+            for (int sort = 0; sort < 2; sort++)
             {
                 switch (sort)
                 {
                 case 0:
                     {
-                        CPUSequentialRadixSort sorter(n, tab);
+                        sorter = new CPUSequentialRadixSort(n, tab);
                         start = chrono::steady_clock::now();
-                        sorter.Sort();
+                        sorter->Sort();
                         end = chrono::steady_clock::now();
                     }
                     break;
                 case 1:
                     {
-                        CPURadixSortParallel sorter(n, tab);
+                        sorter = new CPURadixSortParallel(n, tab);
                         start = chrono::steady_clock::now();
-                        sorter.Sort();
+                        sorter->Sort();
                         end = chrono::steady_clock::now();
                     }
                     break;
@@ -114,8 +116,7 @@ int main()
 
                 if (!successful)
                 {
-                    cout << "Sorting was not done correctly for " << sort_names[sort] << "!" << endl;
-                    //PrintTable(tab, n);
+                    cout << "Sorting was not done correctly for " << sorter->GetName() << "!" << endl;
                 }
 
                 // Bring back data

@@ -6,30 +6,65 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+#include <barrier>
+#include <functional>
+#include <array>
+#include <vector>
 
 class CPURadixSortParallel : public RadixSort {
 private:
-    void CountingSort(long int exp, long int* output, int thread_id, int num_threads) {
-        int countArray[10] = { 0 };
+    int num_threads;
+    std::barrier<std::function<void()>> sync_point;
+    std::vector<std::array<int, 10>> local_counts;
+    std::array<int, 10> global_prefix;
+    
+    void CountingSort(long int exp, long int* output, int thread_id, int n_owned, int owned_idx) {
+        local_counts[thread_id] = {0};
         
-        for (int i = thread_id; i < n; i += num_threads) {
-            countArray[(table[i] / exp) % 10]++;
+        for (int i = owned_idx; i < owned_idx + n_owned; i++) {
+            local_counts[thread_id][(table[i] / exp) % 10]++;
         }
 
-        for (int i = 1; i < 10; i++)
-            countArray[i] += countArray[i - 1];
+        sync_point.arrive_and_wait();
 
-        for (int i = n - 1; i >= 0; i--) {
-            int index = (table[i] / exp) % 10;
-            if (i % num_threads == thread_id) {
-                output[countArray[index] - 1] = table[i];
-                countArray[index]--;
+        if (thread_id == 0) {
+            global_prefix = {0};
+            for (int d = 0; d < 10; d++) {
+                for (int t = 0; t < num_threads; t++) {
+                    global_prefix[d] += local_counts[t][d];
+                }
+            }
+            
+            int sum = 0;
+            for (int d = 0; d < 10; d++) {
+                int count = global_prefix[d];
+                global_prefix[d] = sum;
+                sum += count;
             }
         }
+
+        sync_point.arrive_and_wait();
+
+        std::array<int, 10> thread_offset = global_prefix;
+        for (int t = 0; t < thread_id; t++) {
+            for (int d = 0; d < 10; d++) {
+                thread_offset[d] += local_counts[t][d];
+            }
+        }
+
+        for (int i = owned_idx; i < owned_idx + n_owned; i++) {
+            int digit = (table[i] / exp) % 10;
+            output[thread_offset[digit]++] = table[i];
+        }
+
+        sync_point.arrive_and_wait();
     }
 
 public:
-    CPURadixSortParallel(int size, long int* data) : RadixSort(size, data) {}
+    CPURadixSortParallel(int size, long int* data) : RadixSort(size, data), 
+        num_threads(std::thread::hardware_concurrency()), 
+        sync_point(num_threads, [](){}),
+        local_counts(num_threads) {}
 
     const char* GetName() const override {
         return "CPU Parallel Radix Sort";
@@ -46,10 +81,13 @@ public:
 
         for (long int exp = 1; max / exp > 0; exp *= 10) {
             std::vector<std::thread> threads;
-            int num_threads = std::thread::hardware_concurrency();
-
+            int start_idx = 0;
             for (int i = 0; i < num_threads; i++) {
-                threads.emplace_back(&CPURadixSortParallel::CountingSort, this, exp, sortedArray, i, num_threads);
+                int n_owned = n / num_threads;
+                if (i < (n % num_threads))
+                    n_owned++;
+                threads.emplace_back(&CPURadixSortParallel::CountingSort, this, exp, sortedArray, i, n_owned, start_idx);
+                start_idx += n_owned;
             }
 
             for (auto& th : threads) {
