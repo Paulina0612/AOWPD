@@ -14,7 +14,7 @@
 class CPURadixSortParallel : public RadixSort {
 private:
     int num_threads;
-    std::barrier<std::function<void()>> sync_point;
+    std::barrier<> sync_point;
     std::vector<std::array<int, BASE>> local_counts;
     std::array<int, BASE> global_prefix;
     
@@ -63,7 +63,7 @@ private:
 public:
     CPURadixSortParallel(int size, long int* data) : RadixSort(size, data), 
         num_threads(std::thread::hardware_concurrency()), 
-        sync_point(num_threads, [](){}),
+        sync_point(num_threads),
         local_counts(num_threads) {}
 
     const char* GetName() const override {

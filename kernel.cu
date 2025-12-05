@@ -4,6 +4,7 @@
 #include "cpu_radix_sort.cpp"
 #include "cpu_radix_parallel.cpp"
 #include "gpu_radix_sort.cu"
+#include "radix_sort.h"
 
 using namespace std;
 
@@ -74,6 +75,7 @@ int main()
                 tab_copy[i] = tab[i];
             }
 
+            RadixSort *sorter;
             // Sorting and time counting
             for (int sort = 0; sort < 3; sort++)
             {
@@ -81,35 +83,39 @@ int main()
                 {
                 case 0:
                     {
-                        CPUSequentialRadixSort sorter(n, tab);
+                        sorter = new CPUSequentialRadixSort(n, tab);
                         start = chrono::steady_clock::now();
-                        sorter.Sort();
+                        sorter->Sort();
                         end = chrono::steady_clock::now();
                     }
                     break;
                 case 1:
                     {
-                        CPURadixSortParallel sorter(n, tab);
+                        sorter = new CPURadixSortParallel(n, tab);
                         start = chrono::steady_clock::now();
-                        sorter.Sort();
+                        sorter->Sort();
                         end = chrono::steady_clock::now();
                     }
                     break;
                 case 2:
                     {
-                        GPUParallelRadixSort sorter(n, tab);
+                        sorter = new GPUParallelRadixSort(n, tab);
                         start = chrono::steady_clock::now();
-                        sorter.Sort();
+                        sorter->Sort();
                         end = chrono::steady_clock::now();
                     }
                     break;
                 }
-                sort_times[sort] += chrono::duration_cast<chrono::microseconds>(end - start).count();
+
+                if (s != 0) // Do not count first sample
+                {
+                    sort_times[sort] += chrono::duration_cast<chrono::microseconds>(end - start).count();
+                }
 
                 // Checking if sorting was correctly done
                 bool successful = true;
                 for (int i = 1; i < n; i++) {
-                    if (tab[i - 1] > tab[i]) {
+                    if (tab[i - 1] >= tab[i]) {
                         successful = false;
                         break;
                     }
@@ -127,14 +133,14 @@ int main()
                     tab[i] = tab_copy[i];
                 }
             }
-            cout << "End of sample: " << s + 1 << endl;
+            //cout << "End of sample: " << s + 1 << endl;
         }
         
         // Print mean time of execution
         cout << endl << "Results: " << endl;
         for (int i = 0; i < 3; i++)
         {
-            cout << sort_names[i] << ": " << sort_times[i] / sample << " microseconds." << endl;
+            cout << sort_names[i] << ": " << sort_times[i] / (sample-1) << " microseconds." << endl;
         }
         cout << endl;
 

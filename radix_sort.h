@@ -2,6 +2,7 @@
 #define RADIX_SORT_H
 
 #include <iostream>
+const int BASE = 10;
 
 class RadixSort {
 protected:

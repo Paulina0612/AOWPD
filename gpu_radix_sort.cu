@@ -2,61 +2,91 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 
-// Configuration: 16 hexadecimal values (chunks of 4 bits of number)
 #define RADIX 16
 #define BITS_PER_PASS 4
 
-// Compute per-block per-digit counts
-__global__ void count_kernel(long int *d_input, int *d_block_digit_counts, int n, int shift, int num_blocks)
+// Count kernel
+__global__ void count_kernel(long int *d_input, int *d_block_digit_counts, int n, int shift)
 {
     __shared__ int local_counts[RADIX];
+    __shared__ int warp_counts[8][RADIX];  // 256 threads / 32 = 8 warps
 
-    int gid = blockIdx.x * blockDim.x + threadIdx.x;
     int lid = threadIdx.x;
-    int blockSize = blockDim.x;
     int blockId = blockIdx.x;
+    int gid = blockId * blockDim.x + lid;
+    int warp_id = lid / 32;
+    int lane = lid % 32;
 
-    // Initialize local counts
-    for (int i = lid; i < RADIX; i += blockSize)
+    // Initialize shared counts
+    if (lid < RADIX)
     {
-        local_counts[i] = 0;
+        local_counts[lid] = 0;
+    }
+    // Initialize warp counts
+    if (lid < 8 * RADIX)
+    {
+        warp_counts[lid / RADIX][lid % RADIX] = 0;
     }
     __syncthreads();
 
-    // Count digits in this block
+    // Each thread reads one element
+    int digit = -1;
     if (gid < n)
     {
         unsigned long int uvalue = (unsigned long int)d_input[gid];
-        int digit = (uvalue >> shift) & (RADIX - 1);
-        atomicAdd(&local_counts[digit], 1);
+        digit = (uvalue >> shift) & (RADIX - 1);
+    }
+
+    // Warp-level counting using ballot and popc
+    #pragma unroll
+    for (int d = 0; d < RADIX; d++)
+    {
+        unsigned int mask = __ballot_sync(0xffffffff, digit == d);
+        if (lane == 0)
+        {
+            warp_counts[warp_id][d] = __popc(mask);
+        }
+    }
+    __syncthreads();
+
+    // Reduce warp counts to block counts
+    if (lid < RADIX)
+    {
+        int sum = 0;
+        #pragma unroll
+        for (int w = 0; w < 8; w++)
+        {
+            sum += warp_counts[w][lid];
+        }
+        local_counts[lid] = sum;
     }
     __syncthreads();
 
     // Write block's counts to global memory
-    for (int i = lid; i < RADIX; i += blockSize)
+    if (lid < RADIX)
     {
-        d_block_digit_counts[blockId * RADIX + i] = local_counts[i];
+        d_block_digit_counts[blockId * RADIX + lid] = local_counts[lid];
     }
 }
 
-// Scatter elements to output positions
+// Scatter kernel using parallel scan within shared memory
 __global__ void write_kernel(long int *d_input, long int *d_output, int *d_block_offsets, int n, int shift)
 {
-    extern __shared__ int shared_mem[];
-    int *local_offsets = shared_mem;
-
+    __shared__ int digit_offsets[RADIX];
+    __shared__ int scan_temp[256];  // For prefix scan, matches block size
+    
     int lid = threadIdx.x;
     int blockId = blockIdx.x;
     int gid = blockIdx.x * blockDim.x + lid;
 
-    // Initialize per-thread counter array
-    for (int i = 0; i < RADIX; i++)
+    // Load block offsets into shared memory
+    if (lid < RADIX)
     {
-        local_offsets[lid * RADIX + i] = 0;
+        digit_offsets[lid] = d_block_offsets[blockId * RADIX + lid];
     }
     __syncthreads();
 
-    // Read element and mark its digit
+    // Read element and get its digit
     long int value = 0;
     int digit = -1;
     
@@ -65,30 +95,40 @@ __global__ void write_kernel(long int *d_input, long int *d_output, int *d_block
         value = d_input[gid];
         unsigned long int uvalue = (unsigned long int)value;
         digit = (uvalue >> shift) & (RADIX - 1);
-        local_offsets[lid * RADIX + digit] = 1;
     }
-    __syncthreads();
 
-    // Compute local position within block by counting elements with same digit before this thread
-    int local_pos = 0;
-    if (gid < n)
+    // Process each digit value, compute positions for all threads with that digit
+    for (int d = 0; d < RADIX; d++)
     {
-        for (int t = 0; t < lid; t++)
+        // Each thread marks 1 if it has this digit, otherwise 0
+        int has_digit = (digit == d) ? 1 : 0;
+        scan_temp[lid] = has_digit;
+        __syncthreads();
+        
+        // Parallel prefix sum
+        for (int stride = 1; stride < blockDim.x; stride *= 2)
         {
-            local_pos += local_offsets[t * RADIX + digit];
+            int val = 0;
+            if (lid >= stride)
+            {
+                val = scan_temp[lid - stride];
+            }
+            __syncthreads();
+            scan_temp[lid] += val;
+            __syncthreads();
         }
-    }
-
-    // Write element to output at computed global position
-    if (gid < n)
-    {
-        int global_offset = d_block_offsets[blockId * RADIX + digit];
-        int output_pos = global_offset + local_pos;
-        d_output[output_pos] = value;
+        
+        // Write element if this thread has this digit
+        if (gid < n && digit == d)
+        {
+            int local_pos = scan_temp[lid] - 1;
+            int output_pos = digit_offsets[d] + local_pos;
+            d_output[output_pos] = value;
+        }
+        __syncthreads();
     }
 }
 
-// GPU Parallel Radix Sort class declaration and implementation
 class GPUParallelRadixSort : public RadixSort
 {
 public:
@@ -104,8 +144,8 @@ public:
         if (n <= 0)
             return;
 
-        // Configure block and grid dimensions
-        const int threadsPerBlock = 64;
+        // Block and grid dimensions
+        const int threadsPerBlock = 256;
         const int blocksPerGrid = (n + threadsPerBlock - 1) / threadsPerBlock;
 
         // Allocate device memory for input/output buffers
@@ -139,7 +179,7 @@ public:
             int shift = pass * BITS_PER_PASS;
             
             // Count per-block per-digit occurrences
-            count_kernel<<<blocksPerGrid, threadsPerBlock>>>(d_current_input, d_block_counts, n, shift, blocksPerGrid);
+            count_kernel<<<blocksPerGrid, threadsPerBlock>>>(d_current_input, d_block_counts, n, shift);
             cudaDeviceSynchronize();
             
             // Compute prefix sum to determine output positions
@@ -182,8 +222,7 @@ public:
             delete[] h_global_digit_offsets;
 
             // Scatter elements to output positions
-            int shared_mem_size = RADIX * threadsPerBlock * sizeof(int);
-            write_kernel<<<blocksPerGrid, threadsPerBlock, shared_mem_size>>>(d_current_input, d_current_output, d_block_offsets, n, shift);
+            write_kernel<<<blocksPerGrid, threadsPerBlock>>>(d_current_input, d_current_output, d_block_offsets, n, shift);
             cudaDeviceSynchronize();
 
             // Swap buffers for next pass
