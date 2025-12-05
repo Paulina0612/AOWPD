@@ -12,3 +12,8 @@ cmake .. -DBASE=2
 # instead
 make
 ```
+
+But for kernel (which contains GPU algorithm) use this to compile:
+```
+nvcc --std=c++20 kernel.cu -o kernel.exe
+```
